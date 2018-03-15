@@ -1,0 +1,17 @@
+Spark problems-:
+state	constituency	candidate_name	sex	age	category	partyname	partysymbol	general	postal	total	pct_of_total_votes	pct_of_polled_votes	totalvoters
+
+1. Get the name of the candidate who won the constituency, with the data being ordered in asc by state and dsc by the number of votes.
+2. Get the name of candidate who got maximum number of votes in his state.
+3. Number of candidates won in terms of gender i.e. Male and Female
+4. Most Number of voters appeared constituencywise.
+5. Number of winners belong to each party.
+6. Number of candidates won categorywise.
+7. Total Number of votes partysymbolwise.
+
+
+ 
+ 
+ 
+ useful links-:
+ https://www.xaprb.com/blog/2006/12/07/how-to-select-the-firstleastmax-row-per-group-in-sql/
