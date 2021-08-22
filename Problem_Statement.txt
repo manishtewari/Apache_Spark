@@ -1,4 +1,5 @@
 Spark problems-:
+Below are columns of the dataset:
 state	constituency	candidate_name	sex	age	category	partyname	partysymbol	general	postal	total	pct_of_total_votes	pct_of_polled_votes	totalvoters
 
 1. Get the name of the candidate who won the constituency, with the data being ordered in asc by state and dsc by the number of votes.
