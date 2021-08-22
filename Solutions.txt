@@ -2,8 +2,8 @@
 
 spark-shell --packages com.databricks:spark-csv_2.10:1.4.0
 
-Problem1-: Solution is below
-
+Problem1-: Get the name of the candidate who won the constituency, with the data being ordered in asc by state and dsc by the number of votes.
+/* Function to corrrect the dataset*/
   def getSet(fields: String) : String = {
     var nul: StringBuilder = new StringBuilder()
     var str = ""
@@ -26,9 +26,9 @@ val firstresult = electionDF.groupBy("constituency").max("total").withColumnRena
 val correctedColumn = firstresult.withColumnRenamed("constituency","constituency_grouped")
 val midResult = electionDF.join(correctedColumn,correctedColumn("constituency_grouped") === electionDF("constituency") && firstresult("Maximum_Count") === electionDF("total"),"inner")
 val Answer1 = midResult.select("state","constituency_grouped","Maximum_Count","partyname","candidate_name").sort(asc("state"),desc("Maximum_Count"))
-Answer1.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem1")
+Answer1.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem1")
 
-Problem2-:
+Problem2-:Get the name of candidate who got maximum number of votes in his state.
 
 val electionfile = sc.textFile("data-master/electionresults/ls2014.tsv").map(x => x.split("\t"))
 case class election (state:String, constituency:String, candidate_name:String, sex:String,	age:String, category:String, partyname:String, partysymbol:String, general:Int, postal:Int, total:Int, pct_of_total_votes:Double, pct_of_polled_votes:Double, totalvoters:Int)
@@ -37,11 +37,12 @@ val secondresult = electionDF.groupBy("state").max("total").withColumnRenamed("m
 val stateColumn = secondresult.withColumnRenamed("state","state_grouped")
 val midResult = electionDF.join(stateColumn,stateColumn("state_grouped") === electionDF("state") && secondresult("Maximum_Count") === electionDF("total"),"inner")
 val Answer2 = midResult.select("state_grouped","constituency","Maximum_Count","partyname","candidate_name").sort(asc("state"),desc("Maximum_Count"))
-Answer2.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem2")
+Answer2.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem2")
 
 hdfs dfs -get data-master/electionresults/output/problem2/part-00000 /home/manishtewari/data/data-master/electionresults/problem2.csv
 
-problem 3-:
+problem 3-: Number of candidates won in terms of gender i.e. Male and Female
+
 
 val electionfile = sc.textFile("data-master/electionresults/ls2014.tsv").map(x => x.split("\t"))
 case class election (state:String, constituency:String, candidate_name:String, sex:String,	age:String, category:String, partyname:String, partysymbol:String, general:Int, postal:Int, total:Int, pct_of_total_votes:Double, pct_of_polled_votes:Double, totalvoters:Int)
@@ -50,17 +51,17 @@ val thiredresult =  electionDF.groupBy("constituency").max("total").withColumnRe
 val correctedColumn = thiredresult.withColumnRenamed("constituency","constituency_grouped")
 val midResult = electionDF.join(correctedColumn,correctedColumn("constituency_grouped") === electionDF("constituency") && thiredresult("Maximum_Count") === electionDF("total"),"inner")
 val Answer3 = midResult.select("state","constituency_grouped","Maximum_Count","partyname","candidate_name","sex").groupBy("sex").count
-Answer3.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem3")
+Answer3.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem3")
 
-Problem 4-:
+Problem 4-: Most Number of voters appeared constituencywise.
 
 val electionfile = sc.textFile("data-master/electionresults/ls2014.tsv").map(x => x.split("\t"))
 case class election (state:String, constituency:String, candidate_name:String, sex:String,	age:String, category:String, partyname:String, partysymbol:String, general:Int, postal:Int, total:Int, pct_of_total_votes:Double, pct_of_polled_votes:Double, totalvoters:Int)
 val electionDF = electionfile.map(x => election(x(0),x(1),x(2),x(3),x(4),x(5),x(6),x(7),x(8).toInt,x(9).toInt,x(10).toInt,x(11).toDouble,x(12).toDouble,x(13).toInt)).toDF()
 val fourthresult =  electionDF.groupBy("constituency","state").sum("total").withColumnRenamed("sum(total)","Voters_Constituencywise").sort(desc("Voters_Constituencywise"))
-fourthresult.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem4")
+fourthresult.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem4")
 
-Problem 5 -:
+Problem 5 -: Number of winners belong to each party.
 
 val electionfile = sc.textFile("data-master/electionresults/ls2014.tsv").map(x => x.split("\t"))
 case class election (state:String, constituency:String, candidate_name:String, sex:String,	age:String, category:String, partyname:String, partysymbol:String, general:Int, postal:Int, total:Int, pct_of_total_votes:Double, pct_of_polled_votes:Double, totalvoters:Int)
@@ -69,9 +70,9 @@ val firstresult = electionDF.groupBy("constituency").max("total").withColumnRena
 val correctedColumn = firstresult.withColumnRenamed("constituency","constituency_grouped")
 val midResult = electionDF.join(correctedColumn,correctedColumn("constituency_grouped") === electionDF("constituency") && firstresult("Maximum_Count") === electionDF("total"),"inner")
 val Answer5 = midResult.select("state","constituency_grouped","Maximum_Count","partyname","candidate_name").groupBy("partyname").count.sort(desc("count"))
-Answer5.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem5")
+Answer5.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem5")
 
-Problem 6 -:
+Problem 6 -: Number of candidates won categorywise.
 
 val electionfile = sc.textFile("data-master/electionresults/ls2014.tsv").map(x => x.split("\t"))
 case class election (state:String, constituency:String, candidate_name:String, sex:String,	age:String, category:String, partyname:String, partysymbol:String, general:Int, postal:Int, total:Int, pct_of_total_votes:Double, pct_of_polled_votes:Double, totalvoters:Int)
@@ -80,15 +81,15 @@ val firstresult = electionDF.groupBy("constituency").max("total").withColumnRena
 val correctedColumn = firstresult.withColumnRenamed("constituency","constituency_grouped")
 val midResult = electionDF.join(correctedColumn,correctedColumn("constituency_grouped") === electionDF("constituency") && firstresult("Maximum_Count") === electionDF("total"),"inner")
 val Answer6 = midResult.select("state","constituency_grouped","Maximum_Count","partyname","candidate_name","category").groupBy("category").count.sort(desc("count"))
-Answer6.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem6")
+Answer6.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem6")
 
-Problem 7 -:
+Problem 7 -: Total Number of votes partysymbolwise.
 
 val electionfile = sc.textFile("data-master/electionresults/ls2014.tsv").map(x => x.split("\t"))
 case class election (state:String, constituency:String, candidate_name:String, sex:String,	age:String, category:String, partyname:String, partysymbol:String, general:Int, postal:Int, total:Int, pct_of_total_votes:Double, pct_of_polled_votes:Double, totalvoters:Int)
 val electionDF = electionfile.map(x => election(x(0),x(1),x(2),x(3),x(4),x(5),x(6),x(7),x(8).toInt,x(9).toInt,x(10).toInt,x(11).toDouble,x(12).toDouble,x(13).toInt)).toDF()
 val fifthresult =  electionDF.groupBy("partysymbol").sum("total").withColumnRenamed("sum(total)","partysymbolwise").sort(desc("partysymbolwise"))
-fifthresult.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem7")
+fifthresult.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem7")
 
 fifthresult.write.saveAsTable("PartySymbol27") ---write to hive table
 
@@ -109,7 +110,7 @@ val joinedDF = maxVotes.join(electionDF,electionDF("constituency") === maxVotes(
 val marginDF = joinedDF.withColumn("Win_Margin",abs(coalesce($"Maximum_Count",lit(0))-coalesce($"total",lit(0)))).filter("Win_Margin != 0").groupBy("constituency").agg(min("Win_Margin"), max("Maximum_Count")).withColumnRenamed("max(Maximum_Count)","Maximum_Count").withColumnRenamed("min(Win_Margin)","Margin").sort(desc("Margin")).withColumnRenamed("constituency","sortedConstituency")
 val midResult = electionDF.join(marginDF,marginDF("sortedConstituency") === electionDF("constituency") && marginDF("Maximum_Count") === electionDF("total") ,"inner")
 val Answer8 = midResult.select("state","partyname","constituency","candidate_name","category","Maximum_Count","Margin").sort(desc("Margin"))
-Answer8.repartition(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem8")
+Answer8.coalesce(1).write.format("com.databricks.spark.csv").option("header", "true").option("delimiter", ",").option("inferSchema", "true").save("data-master/electionresults/output/problem8")
 
 
 //val marginDF = joinedDF.withColumn("Win_Margin",abs(coalesce($"Maximum_Count",lit(0))-coalesce($"total",lit(0)))).filter($"Win_Margin" = 0).groupBy("constituency").min("total").withColumnRenamed("min(total)","Margin")
