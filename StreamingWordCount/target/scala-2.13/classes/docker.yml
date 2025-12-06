@@ -1,0 +1,163 @@
+services:
+kafka-broker:
+  image: apache/kafka:4.0.0
+  platform: linux/amd64
+  container_name: kafka-broker
+  ports:
+    - "9092:9092"
+  networks:
+    - local-iceberg-lakehouse
+  environment:
+    kafka.producer.key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    kafka.producer.value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    KAFKA_NODE_ID: 1
+    KAFKA_PROCESS_ROLES: 'broker,controller'
+    KAFKA_LISTENERS: 'PLAINTEXT://kafka-broker:29092,CONTROLLER://kafka-broker:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+    KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker:29092,PLAINTEXT_HOST://localhost:9092'
+    KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+    KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker:29093'
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    KAFKA_NUM_PARTITIONS: 1
+
+  flink-jobmanager:
+    build:
+      context: .
+      dockerfile: flink/Dockerfile
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    networks:
+      - local-iceberg-lakehouse
+    depends_on:
+      - polaris
+      - minio
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager  
+
+  flink-taskmanager:
+    build:
+      context: .
+      dockerfile: flink/Dockerfile
+    command: taskmanager
+    networks:
+      - local-iceberg-lakehouse
+    depends_on:
+      - polaris
+      - minio
+    deploy:
+      replicas: 1
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: dummy-region
+      S3_ENDPOINT: http://minio:9000
+      S3_PATH_STYLE_ACCESS: "true"
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager  
+        taskmanager.numberOfTaskSlots: 8  
+
+  flink-sql-client:
+    build:
+      context: .
+      dockerfile: flink/Dockerfile
+    command: [ "sql-client.sh" ]
+    networks:
+      - local-iceberg-lakehouse
+    depends_on:
+      - polaris
+      - minio
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: dummy-region
+      S3_ENDPOINT: http://minio:9000
+      S3_PATH_STYLE_ACCESS: "true"
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager  
+        rest.address: flink-jobmanager
+    stdin_open: true
+    tty: true
+
+  polaris:
+    image: apache/polaris:latest
+    platform: linux/amd64
+    ports:
+      - "8181:8181"
+      - "8182:8182"
+    networks:
+      - local-iceberg-lakehouse
+    depends_on:
+      - minio
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: dummy-region
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+      AWS_ENDPOINT_URL_STS: http://minio:9000
+      POLARIS_BOOTSTRAP_CREDENTIALS: default-realm,root,secret
+      polaris.features.DROP_WITH_PURGE_ENABLED: true
+      polaris.realm-context.realms: default-realm
+    healthcheck:
+      test: ["CMD", "curl", "http://localhost:8182/healthcheck"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  trino:
+    image: trinodb/trino:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - TRINO_JVM_OPTS=-Xmx2G
+    networks:
+      - local-iceberg-lakehouse
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: dummy-region
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+      MINIO_DOMAIN: minio
+    networks:
+      local-iceberg-lakehouse:
+        aliases:
+          - warehouse.minio
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    command: ["server", "/data", "--console-address", ":9001"]
+
+  minio-client:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    networks:
+      - local-iceberg-lakehouse
+    volumes:
+      - /tmp:/tmp
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      AWS_REGION: dummy-region
+    entrypoint: >
+      /bin/sh -c "  
+      until (mc alias set minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;  
+      mc rm -r --force minio/warehouse;  
+      mc mb minio/warehouse;  
+      mc anonymous set public minio/warehouse;  
+      tail -f /dev/null  
+      "   
+
+networks:
+  local-iceberg-lakehouse:
+    name: local-iceberg-lakehouse

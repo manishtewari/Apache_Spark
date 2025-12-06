@@ -1,0 +1,17 @@
+[debug] > Exec(sbt clean compile, None, None)
+[error] Expected ID character
+[error] Not a valid command: sbt (similar: set, boot, last)
+[error] Expected 'sbtRebootNetwork'
+[error] Expected project ID
+[error] Expected configuration
+[error] Expected ':'
+[error] Expected key
+[error] Not a valid key: sbt (similar: test, state, ivySbt)
+[error] Expected 'sbtPromptChannel'
+[error] Expected 'sbtRebootImpl'
+[error] Expected 'sbtReportResult'
+[error] Expected 'sbtMapExec'
+[error] Expected 'sbtCompleteExec'
+[error] sbt clean compile
+[error]    ^
+[debug] > Exec(idea-shell, None, None)
