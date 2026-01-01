@@ -11,9 +11,6 @@ import org.apache.spark.sql.functions._
 import com.spark.appStreaming.PolarisBootstrap._
 import com.spark.appStreaming.genricFunctions.DFHelpers
 
-import java.net.URI
-import java.net.http.{HttpClient, HttpRequest, HttpResponse}
-
 object StreamingTransactions {
 
   def main(args: Array[String]): Unit = {
@@ -24,7 +21,6 @@ object StreamingTransactions {
      val iceberg_aws = config.getString("iceberg_aws")
      val region = config.getString("region")
      val polaris_catalog_uri = config.getString("polaris_catalog_uri")
-    // CONFIGURATION SECTION
      val POLARIS_MANAGEMENT = config.getString("POLARIS_MANAGEMENT")
      val access_key = config.getString("access_key")
      val secret_key = config.getString("secret_key")
@@ -35,8 +31,7 @@ object StreamingTransactions {
      val token = authenticate()
      val authHeader = s"Bearer $token"
 
-      CATALOG_NAMES.foreach(ele => ensureCatalog(ele,authHeader))
-     // var creds = ensurePrincipal(APP_PRINCIPAL,authHeader)
+     CATALOG_NAMES.foreach(ele => ensureCatalog(ele,authHeader))
      val maybeCreds = ensurePrincipal(APP_PRINCIPAL, authHeader)
      val appCreds =
          maybeCreds.getOrElse {
@@ -47,55 +42,10 @@ object StreamingTransactions {
               )
             }
          }
-/*
-        println(s"Rotating credentials for application principal [$APP_PRINCIPAL]")
 
-        val rotateReq = HttpRequest.newBuilder()
-          .uri(URI.create(s"$POLARIS_MANAGEMENT/principals/$APP_PRINCIPAL/rotate"))
-          .header("Authorization", authHeader)
-          .POST(HttpRequest.BodyPublishers.noBody())
-          .build()
+    manageRole(APP_PRINCIPAL,authHeader,BOOTSTRAP_PRINCIPAL,CATALOG_NAMES)
 
-        val resp = send(rotateReq)
-        if (resp.statusCode() == 200) {
-          val json = mapper.readTree(resp.body())
-          val c = json.get("credentials")
-          println(s"Rotated credentials for '$APP_PRINCIPAL'.")
-          println(s"  clientId: ${c.get("clientId").asText()}")
-          println(s"  clientSecret: ${c.get("clientSecret").asText()}")
-          c
-            } else {
-              throw new RuntimeException(s"Failed to rotate credentials: ${resp.body()}")
-            }
-      }
-
- */
-      val ROLE_NAME = s"${APP_PRINCIPAL}_role"
-      val roleBody = s"""{ "principalRole": { "name": "$ROLE_NAME" } }"""
-
-      post(s"$POLARIS_MANAGEMENT/principal-roles", roleBody, authHeader)
-      put(
-        s"$POLARIS_MANAGEMENT/principals/$APP_PRINCIPAL/principal-roles",
-        roleBody,
-        authHeader
-      )
-      println(s"Assigned principal role '$ROLE_NAME' to '$APP_PRINCIPAL'.")
-
-      CATALOG_NAMES.foreach { cat =>
-      val catRole = s"${cat}_role"
-      val catRoleBody = s"""{ "catalogRole": { "name": "$catRole" } }"""
-      post(s"$POLARIS_MANAGEMENT/catalogs/$cat/catalog-roles", catRoleBody,authHeader)
-      put(s"$POLARIS_MANAGEMENT/principal-roles/$ROLE_NAME/catalog-roles/$cat", catRoleBody,authHeader)
-      val grantBody =
-        """{ "grant": { "type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT" } }"""
-
-      put(s"$POLARIS_MANAGEMENT/catalogs/$cat/catalog-roles/$catRole/grants", grantBody,authHeader)
-      println(s"Granted full access on '$cat'.")
-      }
-
-    setupPermissions("warehouse", "service_admin", authHeader)
-    authorizeRootForWarehouse("warehouse", authHeader)
-
+    //Setting the aws region for the executors
     System.setProperty("aws.region", s"$region")
     var spark: SparkSession = null
       CATALOG_NAMES.foreach { cat =>
@@ -194,7 +144,7 @@ object StreamingTransactions {
 
     spark.sql("show tables").show()
     println("post table creation")
-    flattenDf.writeStream
+    flattenDf.filter(col("transaction_id").isNotNull).writeStream
         .format("iceberg")
         .outputMode("append")
         .trigger(Trigger.ProcessingTime("6 seconds"))
@@ -202,16 +152,8 @@ object StreamingTransactions {
         .toTable("warehouse.spark_demo.customer")
        .awaitTermination()
 
-
       println("count of records ===> "+spark.sql("SELECT * FROM customer").count())
 
-
-//      flattenDf.writeStream.trigger(Trigger.ProcessingTime("10 seconds")).outputMode("append")
-//        .format("console").start().awaitTermination()
-/*
-      flattenDf.writeStream.trigger(Trigger.ProcessingTime("10 seconds")).outputMode("append")
-        .format("csv").
-        */
     }
 
 

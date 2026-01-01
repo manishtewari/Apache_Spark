@@ -23,66 +23,6 @@ kafka-broker:
     KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     KAFKA_NUM_PARTITIONS: 1
 
-  flink-jobmanager:
-    build:
-      context: .
-      dockerfile: flink/Dockerfile
-    ports:
-      - "8081:8081"
-    command: jobmanager
-    networks:
-      - local-iceberg-lakehouse
-    depends_on:
-      - polaris
-      - minio
-    environment:
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: flink-jobmanager  
-
-  flink-taskmanager:
-    build:
-      context: .
-      dockerfile: flink/Dockerfile
-    command: taskmanager
-    networks:
-      - local-iceberg-lakehouse
-    depends_on:
-      - polaris
-      - minio
-    deploy:
-      replicas: 1
-    environment:
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY: password
-      AWS_REGION: dummy-region
-      S3_ENDPOINT: http://minio:9000
-      S3_PATH_STYLE_ACCESS: "true"
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: flink-jobmanager  
-        taskmanager.numberOfTaskSlots: 8  
-
-  flink-sql-client:
-    build:
-      context: .
-      dockerfile: flink/Dockerfile
-    command: [ "sql-client.sh" ]
-    networks:
-      - local-iceberg-lakehouse
-    depends_on:
-      - polaris
-      - minio
-    environment:
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY: password
-      AWS_REGION: dummy-region
-      S3_ENDPOINT: http://minio:9000
-      S3_PATH_STYLE_ACCESS: "true"
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: flink-jobmanager  
-        rest.address: flink-jobmanager
-    stdin_open: true
-    tty: true
-
   polaris:
     image: apache/polaris:latest
     platform: linux/amd64

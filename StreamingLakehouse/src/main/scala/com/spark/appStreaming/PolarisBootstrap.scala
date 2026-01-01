@@ -11,15 +11,10 @@ object PolarisBootstrap {
 
   // CONFIGURATION SECTION
   val config: Config = ConfigFactory.load("streaming.conf")
-
   val POLARIS_MANAGEMENT = config.getString("POLARIS_MANAGEMENT")
   val AUTH = config.getString("AUTH")
-
   val ADMIN_CLIENT_ID = config.getString("ADMIN_CLIENT_ID")
   val ADMIN_CLIENT_SECRET = config.getString("ADMIN_CLIENT_SECRET")
-
-  val CATALOG_NAMES  = config.getString("CATALOG_NAMES")
-  val PRINCIPAL_NAME = config.getString("PRINCIPAL_NAME")
 
   // ==============================
   // HTTP + JSON SETUP
@@ -67,6 +62,31 @@ object PolarisBootstrap {
       Thread.sleep(3000)
     }
     throw new RuntimeException("Polaris not ready or authentication failed.")
+  }
+
+  //Create Principal role, catalog role and attach them
+
+  def manageRole(app_principal: String, authHeader:String, bootstrap_principal: String, catalog_names: List[String])={
+    val ROLE_NAME = s"${app_principal}_role"
+    val roleBody = s"""{ "principalRole": { "name": "$ROLE_NAME" } }"""
+    post(s"$POLARIS_MANAGEMENT/principal-roles", roleBody, authHeader)
+    put(
+      s"$POLARIS_MANAGEMENT/principals/$bootstrap_principal/principal-roles",
+      roleBody,
+      authHeader
+    )
+    println(s"Assigned principal role '$ROLE_NAME' to '$app_principal'.")
+    catalog_names.foreach { cat =>
+      val catRole = s"${cat}_role"
+      val catRoleBody = s"""{ "catalogRole": { "name": "$catRole" } }"""
+      post(s"$POLARIS_MANAGEMENT/catalogs/$cat/catalog-roles", catRoleBody,authHeader)
+      put(s"$POLARIS_MANAGEMENT/principal-roles/$ROLE_NAME/catalog-roles/$cat", catRoleBody,authHeader)
+      val grantBody =
+        """{ "grant": { "type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT" } }"""
+      put(s"$POLARIS_MANAGEMENT/catalogs/$cat/catalog-roles/$catRole/grants", grantBody,authHeader)
+      println(s"Granted full access on '$cat'.")
+    }
+
   }
 
   // ==============================
@@ -127,10 +147,6 @@ object PolarisBootstrap {
   }
 
 
-  // ==============================
-  // 2. ENSURE PRINCIPAL
-  // ==============================
-
   def ensurePrincipal(name: String,authHeader: String): Option[JsonNode] = {
     val getReq = HttpRequest.newBuilder()
       .uri(URI.create(s"$POLARIS_MANAGEMENT/principals/$name"))
@@ -178,85 +194,6 @@ object PolarisBootstrap {
     }
   }
 
-  // ==============================
-  // 3. CONFIGURE PERMISSIONS
-  // ==============================
-
-  /**
-   * Orchestrates the permission setup for a catalog.
-   * This allows the principal to actually write/create tables.
-   */
-  def setupPermissions(catalogName: String, principalRoleName: String, authHeader: String): Unit = {
-    val catalogRoleName = s"${catalogName}_data_role"
-
-    // 1. Create the Catalog Role inside the specific catalog
-    ensureCatalogRole(catalogName, catalogRoleName, authHeader)
-
-    // 2. Grant CATALOG_MANAGE_CONTENT to the Catalog Role
-    // This permission is required for 'vended-credentials' and table creation
-    grantCatalogPrivilege(catalogName, catalogRoleName, "CATALOG_MANAGE_CONTENT", authHeader)
-
-    // 3. Attach the Catalog Role to the Principal Role
-    // This links your 'root' user's role to the catalog permissions
-    assignCatalogRoleToPrincipalRole(principalRoleName, catalogName, catalogRoleName, authHeader)
-  }
-
-  private def ensureCatalogRole(catalogName: String, roleName: String, authHeader: String): Unit = {
-    val url = s"$POLARIS_MANAGEMENT/catalogs/$catalogName/roles"
-    val body = s"""{ "catalogRole": { "name": "$roleName" } }"""
-
-    val resp = send(HttpRequest.newBuilder()
-      .uri(URI.create(url))
-      .header("Authorization", authHeader)
-      .header("Content-Type", "application/json")
-      .POST(HttpRequest.BodyPublishers.ofString(body))
-      .build())
-
-    if (resp.statusCode() == 201 || resp.statusCode() == 200) {
-      println(s"Catalog role '$roleName' ensured in '$catalogName'.")
-    } else if (resp.statusCode() == 409) {
-      println(s"Catalog role '$roleName' already exists.")
-    } else {
-      println(s"Warning: Catalog role setup status ${resp.statusCode()}: ${resp.body()}")
-    }
-  }
-
-  private def grantCatalogPrivilege(catalogName: String, roleName: String, privilege: String, authHeader: String): Unit = {
-    val url = s"$POLARIS_MANAGEMENT/catalogs/$catalogName/roles/$roleName/grants"
-    val body = s"""{ "grant": { "privilege": "$privilege" } }"""
-
-    val resp = send(HttpRequest.newBuilder()
-      .uri(URI.create(url))
-      .header("Authorization", authHeader)
-      .header("Content-Type", "application/json")
-      .POST(HttpRequest.BodyPublishers.ofString(body))
-      .build())
-
-    if (resp.statusCode() == 201 || resp.statusCode() == 200) {
-      println(s"Granted $privilege to $roleName.")
-    } else {
-      println(s"Privilege grant status ${resp.statusCode()}: ${resp.body()}")
-    }
-  }
-
-  private def assignCatalogRoleToPrincipalRole(pRoleName: String, catalogName: String, cRoleName: String, authHeader: String): Unit = {
-    val url = s"$POLARIS_MANAGEMENT/principal-roles/$pRoleName/catalog-roles/$catalogName"
-    val body = s"""{ "catalogRole": { "name": "$cRoleName" } }"""
-
-    val resp = send(HttpRequest.newBuilder()
-      .uri(URI.create(url))
-      .header("Authorization", authHeader)
-      .header("Content-Type", "application/json")
-      .POST(HttpRequest.BodyPublishers.ofString(body))
-      .build())
-
-    if (resp.statusCode() == 201 || resp.statusCode() == 200) {
-      println(s"Linked catalog role '$cRoleName' to principal role '$pRoleName'.")
-    } else {
-      println(s"Role linking status ${resp.statusCode()}: ${resp.body()}")
-    }
-  }
-
   def post(url: String, body: String,authHeader : String): Unit =
     send(HttpRequest.newBuilder()
       .uri(URI.create(url))
@@ -272,29 +209,5 @@ object PolarisBootstrap {
       .header("Content-Type", "application/json")
       .PUT(HttpRequest.BodyPublishers.ofString(body))
       .build())
-
-  def authorizeRootForWarehouse(catalogName: String, authHeader: String): Unit = {
-    val catalogRoleName = s"${catalogName}_writer"
-    val principalRoleName = "service_admin" // Default for 'root'
-
-    println(s"Setting up security: Principal(root) -> Role($principalRoleName) -> CatalogRole($catalogRoleName)")
-
-    // 1. Create Catalog Role inside the catalog
-    post(s"$POLARIS_MANAGEMENT/catalogs/$catalogName/roles",
-      s"""{"catalogRole": {"name": "$catalogRoleName"}}""", authHeader)
-
-    // 2. Grant Table Creation privileges to that Catalog Role
-    post(s"$POLARIS_MANAGEMENT/catalogs/$catalogName/catalog-roles/$catalogRoleName/grants",
-      s"""{"grant": {"privilege": "CATALOG_MANAGE_CONTENT"}}""", authHeader)
-
-    // 3. Ensure the Principal Role 'service_admin' exists (usually does by default)
-    // If not, you'd create it via /management/v1/principal-roles
-
-    // 4. Link the Catalog Role to the Principal Role
-    post(s"$POLARIS_MANAGEMENT/principal-roles/$principalRoleName/catalog-roles/$catalogName",
-      s"""{"catalogRole": {"name": "$catalogRoleName"}}""", authHeader)
-
-    println("Security configuration applied.")
-  }
 
 }
