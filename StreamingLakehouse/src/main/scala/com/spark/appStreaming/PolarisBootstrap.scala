@@ -183,8 +183,6 @@ object PolarisBootstrap {
         val json = mapper.readTree(resp.body())
         val creds = json.get("credentials")
         println(s"Created principal '$name'.")
-        println(s"  clientId: ${creds.get("clientId").asText()}")
-        println(s"  clientSecret: ${creds.get("clientSecret").asText()}")
         Some(creds)
       case 409 =>
         println(s"Principal '$name' already exists (409).")
