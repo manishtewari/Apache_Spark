@@ -14,7 +14,7 @@ import com.spark.appStreaming.genricFunctions.DFHelpers
 object StreamingTransactions {
 
   def main(args: Array[String]): Unit = {
-
+     //Load Configs from configuration file
      val config: Config = ConfigFactory.load("streaming.conf")
      val iceberg_version = config.getString("iceberg_version")
      val polaris_version = config.getString("polaris_version")
@@ -28,22 +28,14 @@ object StreamingTransactions {
      val CATALOG_NAMES  = List("warehouse")
      val BOOTSTRAP_PRINCIPAL = config.getString("BOOTSTRAP_PRINCIPAL")
      val APP_PRINCIPAL = config.getString("APP_PRINCIPAL")
+    //Get the Auth token inorder to give permissions
      val token = authenticate()
      val authHeader = s"Bearer $token"
 
      CATALOG_NAMES.foreach(ele => ensureCatalog(ele,authHeader))
-     val maybeCreds = ensurePrincipal(APP_PRINCIPAL, authHeader)
-     val appCreds =
-         maybeCreds.getOrElse {
-            // 🔥 Safety guard — NEVER rotate bootstrap principal
-            if (APP_PRINCIPAL == BOOTSTRAP_PRINCIPAL) {
-              throw new IllegalStateException(
-                "Attempted to rotate bootstrap principal credentials"
-              )
-            }
-         }
+     val appCreds = ensurePrincipal(APP_PRINCIPAL, authHeader)
 
-    manageRole(APP_PRINCIPAL,authHeader,BOOTSTRAP_PRINCIPAL,CATALOG_NAMES)
+     manageRole(APP_PRINCIPAL,authHeader,BOOTSTRAP_PRINCIPAL,CATALOG_NAMES)
 
     //Setting the aws region for the executors
     System.setProperty("aws.region", s"$region")
