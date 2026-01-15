@@ -1,5 +1,4 @@
-package main.scala.com.spark.app
-
+package com.spark.app
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import com.spark.app.PolarisBootstrap._
@@ -15,6 +14,7 @@ object NycTaxiDataAnalysis {
       sys.exit(1)
     }
     //Load Configs from configuration file
+
     val file_url = args(0)
     val file_names = args(1)
     val data_reload = args(2).toBoolean
@@ -26,6 +26,7 @@ object NycTaxiDataAnalysis {
     var dataLoaded = false // data downloaded flag
 
     catalog_names.foreach(ele =>  catalogExists = ensureCatalog(ele, authHeader))
+
     //Setting the aws region for the executors
     System.setProperty("aws.region", s"$region")
     var spark: SparkSession = null
@@ -44,25 +45,25 @@ object NycTaxiDataAnalysis {
     }
 
     if (!catalogExists)
-      {
-        //log.info("Give access to newly created catalog only and perform DDL operation")
-        manageRole(app_principal, authHeader, bootstrap_principal, catalog_names)
-        performDDL(spark,"warehouse","spark_demo","nyc_traffic")
-        //
-        if (!dataLoaded) {
-          file_names.split("\\|").foreach(file_name => {
-            println("calling for file " + file_name)
-            val params: (String, String) = getUrlFolder(file_name, file_url)
-            println(params._1 + " and " + params._2)
-            dataLoaded = dataDownload(params._1, endpoint_url, access_key, secret_key, bucketName, params._2)
-          })
-        }
-        if (!dataLoaded)
-          {
-            println("No data to process")
-            sys.exit(1)
-          }
+    {
+      //log.info("Give access to newly created catalog only and perform DDL operation")
+      manageRole(app_principal, authHeader, bootstrap_principal, catalog_names)
+      performDDL(spark,"warehouse","spark_demo","nyc_traffic")
+      //
+      if (!dataLoaded) {
+        file_names.split("\\|").foreach(file_name => {
+          println("calling for file " + file_name)
+          val params: (String, String) = getUrlFolder(file_name, file_url)
+          println(params._1 + " and " + params._2)
+          dataLoaded = dataDownload(params._1, endpoint_url, access_key, secret_key, bucketName, params._2)
+        })
       }
+      if (!dataLoaded)
+      {
+        println("No data to process")
+        sys.exit(1)
+      }
+    }
 
     println("print spark configuration ")
     spark.conf.getAll.filter(_._1.contains("spark.sql.catalog")).foreach(println)
@@ -79,8 +80,8 @@ object NycTaxiDataAnalysis {
       .drop("payment_type","RatecodeID","VendorID","store_and_fwd_flag")
 
     val tripPickZoneDf = yellowTripEnriched.join(taxi_zone_df,
-      yellowTripEnriched.col("PULocationID") === taxi_zone_df.col("LocationID")
-      ,"left").withColumn("Pickup_Borough",col("Borough")).withColumn("Pickup_Zone",col("Zone"))
+        yellowTripEnriched.col("PULocationID") === taxi_zone_df.col("LocationID")
+        ,"left").withColumn("Pickup_Borough",col("Borough")).withColumn("Pickup_Zone",col("Zone"))
       .withColumn("Pickup_Service_Zone",col("service_zone"))
       .drop("LocationId","Borough","Zone","service_zone")
 
@@ -95,6 +96,7 @@ object NycTaxiDataAnalysis {
 
     // create cobdate from timestamp field and partition
     println("post table creation")
+    // Table will be created if its not there , the namespace spark_demo should be present
 
     tripDropZoneDf.writeTo("warehouse.spark_demo.nyc_traffic")
       .using("iceberg").partitionedBy(col("cobdate"))
