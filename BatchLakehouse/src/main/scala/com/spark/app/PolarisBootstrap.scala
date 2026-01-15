@@ -1,8 +1,11 @@
-package com.spark.appStreaming
+package main.scala.com.spark.app
 
 import java.net.URI
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.time.Duration
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.spark.app.Constants._
 
 object PolarisBootstrap {
   val client = HttpClient.newBuilder()
