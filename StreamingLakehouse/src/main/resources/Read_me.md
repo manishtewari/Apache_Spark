@@ -100,3 +100,5 @@ curl -X PUT http://localhost:8181/api/management/v1/principals/root/principal-ro
 # Verify if the role was correctly assigned to root.
 
 curl -X GET http://localhost:8181/api/management/v1/principals/root/principal-roles -H "Authorization: Bearer $ACCESS_TOKEN" | jq
+
+In order to run this application in your local it is recommended that we clone this in your local repo, use the YML file to start the docker services, once all the services are up and running you can execute spark streaming application in your local to consume the data.

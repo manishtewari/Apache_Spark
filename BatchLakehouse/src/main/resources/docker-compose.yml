@@ -203,7 +203,7 @@ services:
       - /mnt/e/docker/airflow/logs:/opt/airflow/logs
       - /mnt/e/docker/airflow/plugins:/opt/airflow/plugins
       - /mnt/e/docker/airflow/lib:/opt/airflow/lib
-    
+
     networks:
       local-iceberg-lakehouse:
         aliases:

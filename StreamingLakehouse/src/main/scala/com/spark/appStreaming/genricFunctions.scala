@@ -41,11 +41,10 @@ object genricFunctions {
   }
 
   def createSparkSession(polaris_version: String, iceberg_aws: String, iceberg_version: String, polaris_catalog_uri: String, catalog_name : String, credential: String, region: String, access_key: String, secret_key : String, endpoint_url : String): SparkSession = {
-    val spark = SparkSession.builder.appName("stream app").master("local[*]")
-      .config("spark.jars.packages", s"$polaris_version,$iceberg_aws,$iceberg_version")
+    val spark = SparkSession.builder.appName("streaming app")
+     // .config("spark.jars.packages", s"$polaris_version,$iceberg_aws,$iceberg_version")
       .config(s"spark.sql.catalog.$catalog_name", "org.apache.iceberg.spark.SparkCatalog")
       .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-      .config(s"spark.sql.catalog.$catalog_name", "org.apache.polaris.spark.SparkCatalog")
       .config(s"spark.sql.catalog.$catalog_name.uri", s"$polaris_catalog_uri")
       .config(s"spark.sql.catalog.$catalog_name.catalog-name", s"$catalog_name")
       .config(s"spark.sql.catalog.$catalog_name.warehouse", s"$catalog_name")
@@ -63,7 +62,6 @@ object genricFunctions {
       .config("spark.hadoop.fs.s3a.access.key", s"$access_key")
       .config("spark.hadoop.fs.s3a.secret.key", s"$secret_key")
       .config("spark.hadoop.fs.s3a.path.style.access", "true")
-      .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
       .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
       .config("spark.executorEnv.AWS_REGION", s"$region")
       .config("spark.driver.extraJavaOptions", s"-Daws.region=$region")

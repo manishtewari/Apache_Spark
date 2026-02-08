@@ -9,7 +9,6 @@ object StreamingTransactions {
     val authHeader = s"Bearer $token"
 
     catalog_names.foreach(ele =>  catalogExists = ensureCatalog(ele, authHeader))
-//    manageRole(app_principal,authHeader,bootstrap_principal,catalog_names)
     //Setting the aws region for the executors
     System.setProperty("aws.region", s"$region")
     var spark: SparkSession = null
@@ -20,9 +19,7 @@ object StreamingTransactions {
     // Schema of JSON data that we are expecting
     if (!catalogExists)
     {
-      //log.info("Give access to newly created catalog only and perform DDL operation")
       manageRole(app_principal, authHeader, bootstrap_principal, catalog_names)
-      performDDL(spark,"warehouse","spark_demo","customer")
     }
     performDDL(spark,"warehouse","spark_demo","customer")
     val msg = spark.readStream.format("kafka")
@@ -43,7 +40,6 @@ object StreamingTransactions {
     val flattenDf = transformDf.explodeColumns
     flattenDf.printSchema()
 
-    //Show namespaces
     println("print spark configuration ")
     spark.conf.getAll
       .filter(_._1.contains("spark.sql.catalog"))
@@ -53,7 +49,7 @@ object StreamingTransactions {
       .format("iceberg")
       .outputMode("append")
       .trigger(Trigger.ProcessingTime("6 seconds"))
-      .option("checkpointLocation", "E:/spark_checkpoint/spark_demo_customer")
+      .option("checkpointLocation", "s3a://warehouse/checkpoint_dir/customer")
       .toTable("warehouse.spark_demo.customer")
       .awaitTermination()
 
