@@ -13,8 +13,6 @@ object NycTaxiDataAnalysis {
       println("Usage: NYCTaxiIngestion <file_url> <file_name> ")
       sys.exit(1)
     }
-    //Load Configs from configuration file
-
     val file_url = args(0)
     val file_names = args(1)
     val data_reload = args(2).toBoolean
@@ -23,7 +21,7 @@ object NycTaxiDataAnalysis {
     val authHeader = s"Bearer $token"
     var catalogExists = false
     val bucketName = catalog_names.head
-    var dataLoaded = false // data downloaded flag
+    var dataLoaded = false
 
     catalog_names.foreach(ele =>  catalogExists = ensureCatalog(ele, authHeader))
 
@@ -46,10 +44,8 @@ object NycTaxiDataAnalysis {
 
     if (!catalogExists)
     {
-      //log.info("Give access to newly created catalog only and perform DDL operation")
       manageRole(app_principal, authHeader, bootstrap_principal, catalog_names)
       performDDL(spark,"warehouse","spark_demo","nyc_traffic")
-      //
       if (!dataLoaded) {
         file_names.split("\\|").foreach(file_name => {
           println("calling for file " + file_name)
@@ -94,9 +90,7 @@ object NycTaxiDataAnalysis {
     println("count of records in trip ===> " +tripDropZoneDf.count())
     println("taxi zone df "+ taxi_zone_df.count())
 
-    // create cobdate from timestamp field and partition
     println("post table creation")
-    // Table will be created if its not there , the namespace spark_demo should be present
 
     tripDropZoneDf.writeTo("warehouse.spark_demo.nyc_traffic")
       .using("iceberg").partitionedBy(col("cobdate"))
